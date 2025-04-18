@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph Visualization with Algorithms</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    .container {
+      margin-bottom: 20px;
+    }
+    .input-group {
+      margin: 10px 0;
+    }
+    .input-group input {
+      padding: 8px;
+      margin-right: 5px;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 5px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .graph {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    svg {
+      border: 1px solid #ccc;
+    }
+    .output {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+
+    /* Animation for nodes */
+    .node-visited {
+      animation: node-travel 2s ease-in-out forwards;
+    }
+
+    /* Animation for traveling to the goal node */
+    .node-travel-to-goal {
+      animation: travel-to-goal 2s ease-in-out forwards;
+    }
+
+    @keyframes node-travel {
+      0% {
+        fill: #007bff;
+      }
+      50% {
+        fill: #ff6600;
+      }
+      100% {
+        fill: #ff0000;
+      }
+    }
+
+    @keyframes travel-to-goal {
+      0% {
+        fill: #007bff;
+      }
+      50% {
+        fill: #ff6600;
+      }
+      100% {
+        fill: #ff00ff;
+      }
+    }
+
+    /* Style for the "Developed by Ab Developer" tag */
+    .footer-tag {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      font-size: 14px;
+      color: #007bff;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Graph Visualization with Algorithms</h1>
+  <div class="container">
+    <div class="input-group">
+      <input type="text" id="node-name" placeholder="Node Name">
+      <input type="text" id="link-node" placeholder="Link to Node">
+      <input type="number" id="edge-cost" placeholder="Edge Cost">
+      <button onclick="addNode()">Add Node</button>
+    </div>
+    <div class="input-group">
+      <button onclick="performAlgorithm('BFS')">Run BFS</button>
+      <button onclick="performAlgorithm('DFS')">Run DFS</button>
+      <button onclick="performAlgorithm('UCS')">Run UCS</button>
+    </div>
+    <div class="input-group">
+      <button onclick="resetGraph()">Reset Graph</button>
+    </div>
+  </div>
+  <div class="graph" id="graph"></div>
+  <div class="output" id="output"></div>
+
+  <!-- Footer tag -->
+  <div class="footer-tag">
+    Developed by AB Developer
+  </div>
+
+  <script>
+    const graph = {};
+    const nodeElements = {}; // Store node elements for animation
+    const steps = []; // Store steps of the algorithm for animation
+    const pathToGoal = []; // Store the path to goal node for visualization
+    let currentStep = 0; // Track current step in the traversal
+
+    // Add a node to the graph
+    function addNode() {
+      const nodeName = document.getElementById('node-name').value.trim();
+      const linkNode = document.getElementById('link-node').value.trim();
+      const edgeCost = parseInt(document.getElementById('edge-cost').value.trim());
+
+      if (!nodeName || !linkNode || isNaN(edgeCost) || edgeCost <= 0) {
+        alert('Please enter valid node details!');
+        return;
+      }
+
+      if (!graph[nodeName]) {
+        graph[nodeName] = {};
+      }
+      graph[nodeName][linkNode] = edgeCost;
+
+      if (!graph[linkNode]) {
+        graph[linkNode] = {};
+      }
+      graph[linkNode][nodeName] = edgeCost;
+
+      displayGraph();
+      document.getElementById('node-name').value = '';
+      document.getElementById('link-node').value = '';
+      document.getElementById('edge-cost').value = '';
+    }
+
+    // Display the graph visually
+    function displayGraph() {
+      const graphContainer = document.getElementById('graph');
+      graphContainer.innerHTML = '';
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const width = 500;
+      const height = 400;
+      const radius = 20;
+
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', width);
+      svg.setAttribute('height', height);
+
+      const nodes = Object.keys(graph);
+      const positions = {};
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const angleStep = (2 * Math.PI) / nodes.length;
+
+      nodes.forEach((node, index) => {
+        const angle = index * angleStep;
+        const x = centerX + Math.cos(angle) * (width / 3);
+        const y = centerY + Math.sin(angle) * (height / 3);
+        positions[node] = { x, y };
+      });
+
+      nodes.forEach((node) => {
+        Object.keys(graph[node]).forEach((neighbor) => {
+          if (positions[neighbor]) {
+            const line = document.createElementNS(svgNS, 'line');
+            line.setAttribute('x1', positions[node].x);
+            line.setAttribute('y1', positions[node].y);
+            line.setAttribute('x2', positions[neighbor].x);
+            line.setAttribute('y2', positions[neighbor].y);
+            line.setAttribute('stroke', '#999');
+            line.setAttribute('stroke-width', '2');
+            svg.appendChild(line);
+
+            // Show cost on the edge between nodes (only once, e.g., A to B)
+            const text = document.createElementNS(svgNS, 'text');
+            const midX = (positions[node].x + positions[neighbor].x) / 2;
+            const midY = (positions[node].y + positions[neighbor].y) / 2;
+            text.setAttribute('x', midX);
+            text.setAttribute('y', midY);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', 'black');
+            text.setAttribute('font-size', '12');
+            text.textContent = graph[node][neighbor];
+            svg.appendChild(text);
+          }
+        });
+      });
+
+      nodes.forEach((node) => {
+        const { x, y } = positions[node];
+        const circle = document.createElementNS(svgNS, 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', radius);
+        circle.setAttribute('fill', '#007bff');
+        svg.appendChild(circle);
+
+        const text = document.createElementNS(svgNS, 'text');
+        text.setAttribute('x', x);
+        text.setAttribute('y', y + 5);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', 'white');
+        text.setAttribute('font-size', '12');
+        text.textContent = node;
+        svg.appendChild(text);
+
+        // Store node element for animation
+        nodeElements[node] = circle;
+      });
+
+      graphContainer.appendChild(svg);
+    }
+
+    // Perform BFS, DFS, or UCS
+    function performAlgorithm(type) {
+      const startNode = prompt(`Enter the start node for ${type}:`);
+      const goalNode = prompt(`Enter the goal node for ${type}:`);
+      if (!startNode || !goalNode || !graph[startNode]) {
+        alert('Invalid start or goal node!');
+        return;
+      }
+
+      // Reset steps before running a new algorithm
+      steps.length = 0;
+      pathToGoal.length = 0;
+
+      let result;
+      if (type === 'BFS') result = bfs(startNode, goalNode);
+      if (type === 'DFS') result = dfs(startNode, goalNode);
+      if (type === 'UCS') result = ucs(startNode, goalNode);
+
+      document.getElementById('output').innerHTML =
+        `<strong>${type} Result:</strong> 
+        <br>Route: ${result.route.join(' -> ')} 
+        <br>Cost: ${result.cost}
+        <br>Time Complexity: O(${steps.length})`; // Display time complexity and steps count
+
+      // Save the steps for animation
+      currentStep = 0; // Start from the first step
+      animateNextStep();
+    }
+
+    // BFS Algorithm with animation
+    function bfs(start, goal) {
+      const queue = [[start]];  // Initialize the queue with the start node
+      const visited = new Set();
+      const path = [];
+
+      while (queue.length) {
+        const pathSoFar = queue.shift();
+        const node = pathSoFar[pathSoFar.length - 1];
+        steps.push({ node }); // Store current node for animation
+
+        if (node === goal) {
+          path.push(node);
+          return { route: path, cost: pathSoFar.length - 1 };
+        }
+        if (!visited.has(node)) {
+          visited.add(node);
+          path.push(node);
+          for (const neighbor in graph[node]) {
+            queue.push([...pathSoFar, neighbor]);
+          }
+        }
+      }
+      return { route: [], cost: 0 };
+    }
+
+    // DFS Algorithm with animation
+    function dfs(start, goal) {
+      const stack = [[start, 0]];  // Initialize the stack with the start node
+      const visited = new Set();
+      const path = [];
+
+      while (stack.length) {
+        const [node, cost] = stack.pop();
+        steps.push({ node }); // Store current node for animation
+
+        if (node === goal) {
+          path.push(node);
+          return { route: path, cost };
+        }
+        if (!visited.has(node)) {
+          visited.add(node);
+          path.push(node);
+          for (const neighbor in graph[node]) {
+            stack.push([neighbor, cost + graph[node][neighbor]]);
+          }
+        }
+      }
+      return { route: [], cost: 0 };
+    }
+
+    // UCS Algorithm with animation
+    function ucs(start, goal) {
+      const queue = [[start, 0]];  // Initialize the queue with the start node
+      const visited = new Set();
+      const path = [];
+
+      while (queue.length) {
+        const [node, cost] = queue.shift();
+        steps.push({ node }); // Store current node for animation
+
+        if (node === goal) {
+          path.push(node);
+          return { route: path, cost };
+        }
+        if (!visited.has(node)) {
+          visited.add(node);
+          path.push(node);
+          for (const neighbor in graph[node]) {
+            queue.push([neighbor, cost + graph[node][neighbor]]);
+          }
+          queue.sort((a, b) => a[1] - b[1]);
+        }
+      }
+      return { route: [], cost: 0 };
+    }
+
+    // Animate the traversal steps and travel to the goal
+    function animateNextStep() {
+      if (currentStep >= steps.length) {
+        return;
+      }
+
+      const { node } = steps[currentStep];
+      nodeElements[node].classList.add('node-visited');
+      
+      // If this is the goal node, highlight it
+      if (node === steps[steps.length - 1].node) {
+        nodeElements[node].classList.add('node-travel-to-goal');
+      }
+
+      currentStep++;
+
+      setTimeout(animateNextStep, 1000); // Delay between steps
+    }
+
+    // Reset the graph
+   // Reset the graph
+function resetGraph() {
+  // Clear the graph data structure
+  for (let node in graph) {
+    delete graph[node];
+  }
+
+  // Clear nodeElements
+  for (let node in nodeElements) {
+    delete nodeElements[node];
+  }
+
+  // Clear steps and path
+  steps.length = 0;
+  pathToGoal.length = 0;
+  currentStep = 0;
+
+  // Clear the SVG graph visualization
+  document.getElementById('graph').innerHTML = '';
+
+  // Clear the output display
+  document.getElementById('output').innerHTML = '';
+
+  alert("Graph reset successfully!");
+}
+
+  </script>
+</body>
+</html>
